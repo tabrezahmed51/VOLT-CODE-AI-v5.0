@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Check, X, AlertTriangle, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import React, { useState } from "react";
+import { Check, X, Eye, EyeOff } from "lucide-react";
 
 export interface HunkIssue {
   id: number;
   type: string;
-  severity: 'Critical' | 'High' | 'Medium' | 'Low';
+  severity: "Critical" | "High" | "Medium" | "Low";
   description: string;
   explanation: string;
   original: string;
@@ -20,19 +20,24 @@ interface VisualDiffProps {
 export const VisualDiff: React.FC<VisualDiffProps> = ({
   issues,
   acceptedHunkIds,
-  onToggleHunk
+  onToggleHunk,
 }) => {
-  const [diffMode, setDiffMode] = useState<'side-by-side' | 'inline'>('inline');
-  const [expandedExplanation, setExpandedExplanation] = useState<Record<number, boolean>>({});
+  const [diffMode, setDiffMode] = useState<"side-by-side" | "inline">("inline");
+  const [mobilePane, setMobilePane] = useState<"original" | "patch" | "diff">(
+    "diff",
+  );
+  const [expandedExplanation, setExpandedExplanation] = useState<
+    Record<number, boolean>
+  >({});
 
   const toggleExplanation = (id: number) => {
-    setExpandedExplanation(prev => ({ ...prev, [id]: !prev[id] }));
+    setExpandedExplanation((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const renderInlineDiff = (original: string, fixed: string) => {
-    const originalLines = original.split('\n');
-    const fixedLines = fixed.split('\n');
-    
+    const originalLines = original.split("\n");
+    const fixedLines = fixed.split("\n");
+
     // Simplistic line-by-line diff mapping
     const elements: React.ReactNode[] = [];
     const maxLen = Math.max(originalLines.length, fixedLines.length);
@@ -44,88 +49,183 @@ export const VisualDiff: React.FC<VisualDiffProps> = ({
       if (orig !== undefined && fix !== undefined) {
         if (orig === fix) {
           elements.push(
-            <div key={`n-${i}`} className="flex py-0.5 px-3 hover:bg-white/5 font-mono text-[11px] text-white/50">
-              <span className="w-8 select-none text-white/20 text-right pr-3">{i + 1}</span>
-              <span className="w-8 select-none text-white/20 text-right pr-3">{i + 1}</span>
-              <span className="w-5 select-none text-white/10 text-center font-bold"> </span>
+            <div
+              key={`n-${i}`}
+              className="flex py-0.5 px-3 hover:vol-wash font-mono text-[11px] vol-t2"
+            >
+              <span className="w-8 shrink-0 select-none vol-t2 text-right pr-3">
+                {i + 1}
+              </span>
+              <span className="w-8 shrink-0 select-none vol-t2 text-right pr-3">
+                {i + 1}
+              </span>
+              <span className="w-5 shrink-0 select-none vol-t1/10 text-center font-bold">
+                {" "}
+              </span>
               <span className="whitespace-pre-wrap">{orig}</span>
-            </div>
+            </div>,
           );
         } else {
           elements.push(
-            <div key={`r-${i}`} className="flex py-0.5 px-3 bg-red-500/10 border-l-2 border-red-500 font-mono text-[11px] text-red-400">
-              <span className="w-8 select-none text-red-500/30 text-right pr-3">{i + 1}</span>
-              <span className="w-8 select-none text-red-500/10 text-right pr-3">-</span>
-              <span className="w-5 select-none text-red-500/40 text-center font-bold">-</span>
+            <div
+              key={`r-${i}`}
+              className="flex py-0.5 px-3 bg-red-500/10 border-l-2 border-red-500 font-mono text-[11px] text-red-400"
+            >
+              <span className="w-8 shrink-0 select-none text-red-500/30 text-right pr-3">
+                {i + 1}
+              </span>
+              <span className="w-8 shrink-0 select-none text-red-500/10 text-right pr-3">
+                -
+              </span>
+              <span className="w-5 shrink-0 select-none text-red-500/40 text-center font-bold">
+                -
+              </span>
               <span className="whitespace-pre-wrap">{orig}</span>
-            </div>
+            </div>,
           );
           elements.push(
-            <div key={`a-${i}`} className="flex py-0.5 px-3 bg-green-500/10 border-l-2 border-green-500 font-mono text-[11px] text-green-400">
-              <span className="w-8 select-none text-green-500/10 text-right pr-3">-</span>
-              <span className="w-8 select-none text-green-500/30 text-right pr-3">{i + 1}</span>
-              <span className="w-5 select-none text-green-500/40 text-center font-bold">+</span>
+            <div
+              key={`a-${i}`}
+              className="flex py-0.5 px-3 bg-green-500/10 border-l-2 border-green-500 font-mono text-[11px] text-green-400"
+            >
+              <span className="w-8 shrink-0 select-none text-green-500/10 text-right pr-3">
+                -
+              </span>
+              <span className="w-8 shrink-0 select-none text-green-500/30 text-right pr-3">
+                {i + 1}
+              </span>
+              <span className="w-5 shrink-0 select-none text-green-500/40 text-center font-bold">
+                +
+              </span>
               <span className="whitespace-pre-wrap">{fix}</span>
-            </div>
+            </div>,
           );
         }
       } else if (orig !== undefined) {
         elements.push(
-          <div key={`r-${i}`} className="flex py-0.5 px-3 bg-red-500/10 border-l-2 border-red-500 font-mono text-[11px] text-red-400">
-            <span className="w-8 select-none text-red-500/30 text-right pr-3">{i + 1}</span>
-            <span className="w-8 select-none text-red-500/10 text-right pr-3">-</span>
-            <span className="w-5 select-none text-red-500/40 text-center font-bold">-</span>
+          <div
+            key={`r-${i}`}
+            className="flex py-0.5 px-3 bg-red-500/10 border-l-2 border-red-500 font-mono text-[11px] text-red-400"
+          >
+            <span className="w-8 shrink-0 select-none text-red-500/30 text-right pr-3">
+              {i + 1}
+            </span>
+            <span className="w-8 shrink-0 select-none text-red-500/10 text-right pr-3">
+              -
+            </span>
+            <span className="w-5 shrink-0 select-none text-red-500/40 text-center font-bold">
+              -
+            </span>
             <span className="whitespace-pre-wrap">{orig}</span>
-          </div>
+          </div>,
         );
       } else if (fix !== undefined) {
         elements.push(
-          <div key={`a-${i}`} className="flex py-0.5 px-3 bg-green-500/10 border-l-2 border-green-500 font-mono text-[11px] text-green-400">
-            <span className="w-8 select-none text-green-500/10 text-right pr-3">-</span>
-            <span className="w-8 select-none text-green-500/30 text-right pr-3">{i + 1}</span>
-            <span className="w-5 select-none text-green-500/40 text-center font-bold">+</span>
+          <div
+            key={`a-${i}`}
+            className="flex py-0.5 px-3 bg-green-500/10 border-l-2 border-green-500 font-mono text-[11px] text-green-400"
+          >
+            <span className="w-8 shrink-0 select-none text-green-500/10 text-right pr-3">
+              -
+            </span>
+            <span className="w-8 shrink-0 select-none text-green-500/30 text-right pr-3">
+              {i + 1}
+            </span>
+            <span className="w-5 shrink-0 select-none text-green-500/40 text-center font-bold">
+              +
+            </span>
             <span className="whitespace-pre-wrap">{fix}</span>
-          </div>
+          </div>,
         );
       }
     }
 
     return (
-      <div className="bg-[#050505] border border-white/5 rounded-xl overflow-hidden py-2 max-h-72 overflow-y-auto">
+      <div className="vol-surface border vol-line rounded-xl overflow-hidden overflow-x-auto py-2 max-h-72 overflow-y-auto">
         {elements}
       </div>
     );
   };
 
   const renderSideBySideDiff = (original: string, fixed: string) => {
-    const originalLines = original.split('\n');
-    const fixedLines = fixed.split('\n');
+    const originalLines = original.split("\n");
+    const fixedLines = fixed.split("\n");
+    // < md: one pane at a time via the [Original] [Patch] [Diff] toggle.
+    // ≥ md: both columns stay side by side, toggle hidden.
+    const paneHidden = (pane: "original" | "patch") =>
+      mobilePane === pane ? "" : "hidden";
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Original Column */}
-        <div className="space-y-1">
-          <div className="text-[10px] text-red-400 font-bold uppercase tracking-wider pl-1 mb-1">Original Code</div>
-          <div className="bg-[#0B0303] border border-red-500/10 rounded-xl p-3 max-h-72 overflow-y-auto font-mono text-[11px] text-red-300 space-y-0.5">
-            {originalLines.map((line, idx) => (
-              <div key={idx} className="flex hover:bg-red-500/5 py-0.5 px-1 rounded">
-                <span className="w-8 select-none text-red-500/30 text-right pr-2 shrink-0">{idx + 1}</span>
-                <span className="whitespace-pre-wrap">{line || ' '}</span>
-              </div>
-            ))}
-          </div>
+      <div className="space-y-3">
+        <div className="md:hidden flex gap-1.5" role="tablist">
+          {(["original", "patch", "diff"] as const).map((pane) => (
+            <button
+              key={pane}
+              role="tab"
+              aria-selected={mobilePane === pane}
+              onClick={() => setMobilePane(pane)}
+              className={`flex-1 min-h-[44px] rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-all ${
+                mobilePane === pane
+                  ? "vol-acc-bg text-black"
+                  : "vol-well vol-t2 hover:vol-wash"
+              }`}
+            >
+              {pane === "original"
+                ? "Original"
+                : pane === "patch"
+                  ? "Patch"
+                  : "Diff"}
+            </button>
+          ))}
         </div>
 
-        {/* Fixed Column */}
-        <div className="space-y-1">
-          <div className="text-[10px] text-green-400 font-bold uppercase tracking-wider pl-1 mb-1">Staged Patch</div>
-          <div className="bg-[#030B03] border border-green-500/10 rounded-xl p-3 max-h-72 overflow-y-auto font-mono text-[11px] text-green-300 space-y-0.5">
-            {fixedLines.map((line, idx) => (
-              <div key={idx} className="flex hover:bg-green-500/5 py-0.5 px-1 rounded">
-                <span className="w-8 select-none text-green-500/30 text-right pr-2 shrink-0">{idx + 1}</span>
-                <span className="whitespace-pre-wrap">{line || ' '}</span>
-              </div>
-            ))}
+        {mobilePane === "diff" && (
+          <div className="md:hidden">{renderInlineDiff(original, fixed)}</div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Original Column */}
+          <div className={`space-y-1 ${paneHidden("original")} md:block`}>
+            <div className="text-[10px] text-red-400 font-bold uppercase tracking-wider pl-1 mb-1">
+              Original Code
+            </div>
+            <div className="vol-well border border-red-500/10 rounded-xl p-3 max-h-72 overflow-y-auto overflow-x-auto font-mono text-[11px] text-red-300 space-y-0.5">
+              {originalLines.map((line, idx) => (
+                <div
+                  key={idx}
+                  className="flex hover:bg-red-500/5 py-0.5 px-1 rounded"
+                >
+                  <span className="w-8 shrink-0 select-none text-red-500/30 text-right pr-2">
+                    {idx + 1}
+                  </span>
+                  <span className="whitespace-pre-wrap break-words">
+                    {line || " "}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Fixed Column */}
+          <div className={`space-y-1 ${paneHidden("patch")} md:block`}>
+            <div className="text-[10px] text-green-400 font-bold uppercase tracking-wider pl-1 mb-1">
+              Staged Patch
+            </div>
+            <div className="vol-well border border-green-500/10 rounded-xl p-3 max-h-72 overflow-y-auto overflow-x-auto font-mono text-[11px] text-green-300 space-y-0.5">
+              {fixedLines.map((line, idx) => (
+                <div
+                  key={idx}
+                  className="flex hover:bg-green-500/5 py-0.5 px-1 rounded"
+                >
+                  <span className="w-8 shrink-0 select-none text-green-500/30 text-right pr-2">
+                    {idx + 1}
+                  </span>
+                  <span className="whitespace-pre-wrap break-words">
+                    {line || " "}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -135,27 +235,27 @@ export const VisualDiff: React.FC<VisualDiffProps> = ({
   return (
     <div className="space-y-6 select-none">
       {/* Tab Control */}
-      <div className="flex justify-between items-center bg-[#121212] border border-white/5 rounded-xl p-2 shrink-0">
-        <div className="text-xs text-white/50 font-bold uppercase tracking-wider pl-2">
+      <div className="flex justify-between items-center vol-elev border vol-line rounded-xl p-2 shrink-0">
+        <div className="text-xs vol-t2 font-bold uppercase tracking-wider pl-2">
           Staged Changes ({issues.length} Hunks Available)
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setDiffMode('inline')}
+            onClick={() => setDiffMode("inline")}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
-              diffMode === 'inline'
-                ? 'bg-[#FF5F00] text-black'
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+              diffMode === "inline"
+                ? "vol-acc-bg text-black"
+                : "vol-t2 hover:vol-t1 hover:vol-wash"
             }`}
           >
             Inline View
           </button>
           <button
-            onClick={() => setDiffMode('side-by-side')}
+            onClick={() => setDiffMode("side-by-side")}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
-              diffMode === 'side-by-side'
-                ? 'bg-[#FF5F00] text-black'
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+              diffMode === "side-by-side"
+                ? "vol-acc-bg text-black"
+                : "vol-t2 hover:vol-t1 hover:vol-wash"
             }`}
           >
             Side-By-Side
@@ -165,7 +265,7 @@ export const VisualDiff: React.FC<VisualDiffProps> = ({
 
       {/* Issues list (Hunks) */}
       <div className="space-y-6 max-h-[480px] overflow-y-auto pr-1">
-        {issues.map(issue => {
+        {issues.map((issue) => {
           const isAccepted = acceptedHunkIds.includes(issue.id);
           const showExp = !!expandedExplanation[issue.id];
 
@@ -173,25 +273,34 @@ export const VisualDiff: React.FC<VisualDiffProps> = ({
             <div
               key={issue.id}
               className={`border rounded-2xl overflow-hidden transition-all ${
-                isAccepted 
-                  ? 'border-[#FF5F00]/30 bg-black/35 shadow-[0_0_15px_rgba(255,95,0,0.02)]' 
-                  : 'border-white/5 bg-[#121212]/30 opacity-75'
+                isAccepted
+                  ? "vol-ring vol-wash shadow-[0_0_15px_rgba(255,95,0,0.02)]"
+                  : "vol-line vol-elev opacity-75"
               }`}
             >
               {/* Hunk Header */}
-              <div className="p-4 bg-[#121212] border-b border-white/5 flex flex-wrap justify-between items-center gap-3">
+              <div className="p-4 vol-elev border-b vol-line flex flex-wrap justify-between items-center gap-3">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <span className={`px-2.5 py-1 rounded-md text-[9px] font-black tracking-wider uppercase ${
-                    issue.severity === 'Critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                    issue.severity === 'High' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
-                    issue.severity === 'Medium' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
-                    'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  }`}>
+                  <span
+                    className={`px-2.5 py-1 rounded-md text-[9px] font-black tracking-wider uppercase ${
+                      issue.severity === "Critical"
+                        ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                        : issue.severity === "High"
+                          ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                          : issue.severity === "Medium"
+                            ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+                            : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                    }`}
+                  >
                     {issue.severity}
                   </span>
                   <div>
-                    <h4 className="text-xs font-bold text-white leading-relaxed">{issue.type}</h4>
-                    <p className="text-[10px] text-white/50 mt-0.5">{issue.description}</p>
+                    <h4 className="text-xs font-bold vol-t1 leading-relaxed">
+                      {issue.type}
+                    </h4>
+                    <p className="text-[10px] vol-t2 mt-0.5">
+                      {issue.description}
+                    </p>
                   </div>
                 </div>
 
@@ -199,10 +308,14 @@ export const VisualDiff: React.FC<VisualDiffProps> = ({
                   {/* AI Explanation Toggle */}
                   <button
                     onClick={() => toggleExplanation(issue.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 text-[10px] font-bold text-white/70 hover:text-white transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border vol-line hover:vol-wash text-[10px] font-bold vol-t1 hover:vol-t1 transition-all cursor-pointer"
                   >
-                    {showExp ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    {showExp ? 'HIDE EXPLANATION' : 'EXPLANATION'}
+                    {showExp ? (
+                      <EyeOff className="w-3 h-3" />
+                    ) : (
+                      <Eye className="w-3 h-3" />
+                    )}
+                    {showExp ? "HIDE EXPLANATION" : "EXPLANATION"}
                   </button>
 
                   {/* Accept/Reject Button */}
@@ -210,8 +323,8 @@ export const VisualDiff: React.FC<VisualDiffProps> = ({
                     onClick={() => onToggleHunk(issue.id)}
                     className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-extrabold uppercase transition-all cursor-pointer ${
                       isAccepted
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-red-600/20 text-red-400 border border-red-500/35 hover:bg-red-600/30'
+                        ? "bg-green-600 vol-t1 hover:bg-green-700"
+                        : "bg-red-600/20 text-red-400 border border-red-500/35 hover:bg-red-600/30"
                     }`}
                   >
                     {isAccepted ? (
@@ -230,16 +343,17 @@ export const VisualDiff: React.FC<VisualDiffProps> = ({
               </div>
 
               {/* Diff Code Box */}
-              <div className="p-4 bg-black/25">
-                {diffMode === 'inline' 
+              <div className="p-4 vol-wash">
+                {diffMode === "inline"
                   ? renderInlineDiff(issue.original, issue.fixed)
-                  : renderSideBySideDiff(issue.original, issue.fixed)
-                }
+                  : renderSideBySideDiff(issue.original, issue.fixed)}
 
                 {/* AI Explanation Pane */}
                 {showExp && (
-                  <div className="mt-4 p-4 rounded-xl border border-[#FF5F00]/25 bg-[#FF5F00]/5 text-xs text-white/90 leading-relaxed font-mono space-y-2">
-                    <div className="text-[9px] text-[#FF5F00] font-black uppercase tracking-wider">AI Explanation & Analysis</div>
+                  <div className="mt-4 p-4 rounded-xl border vol-ring vol-acc-wash text-xs vol-t1 leading-relaxed font-mono space-y-2">
+                    <div className="text-[9px] vol-accent font-black uppercase tracking-wider">
+                      AI Explanation & Analysis
+                    </div>
                     <p className="whitespace-pre-line">{issue.explanation}</p>
                   </div>
                 )}

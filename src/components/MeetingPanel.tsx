@@ -1,0 +1,432 @@
+/* eslint-disable react-hooks/set-state-in-effect */
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  AgentCommunicationService,
+  defaultAgents,
+  bossAgent,
+  Meeting,
+  Agent,
+  translate,
+} from "../services/AgentCommunication";
+import { AgentGroupChat } from "./AgentGroupChat";
+import { AudioInterface } from "./AudioInterface";
+import { ExecutionPanel } from "./ExecutionPanel";
+import { Users, LogOut, Plus, Settings, Crown } from "lucide-react";
+
+interface MeetingPanelProps {
+  onClose?: () => void;
+}
+
+export const MeetingPanel: React.FC<MeetingPanelProps> = ({ onClose }) => {
+  const [language, setLanguage] = useState<"en" | "hi">("en");
+  const [communicationService] = useState(
+    () => new AgentCommunicationService(),
+  );
+  const initialized = useRef(false);
+
+  const [meeting, setMeeting] = useState<Meeting | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<string>(bossAgent.id);
+  const [showSettings, setShowSettings] = useState(false);
+  const [isBossPresent, setIsBossPresent] = useState(true);
+
+  const messages = meeting?.messages ?? [];
+  const tasks = meeting?.tasks ?? [];
+  const agentsMap = useMemo(() => {
+    if (!meeting) return new Map<string, Agent>();
+    return new Map(meeting.agents.map((a) => [a.id, a]));
+  }, [meeting]);
+
+  const syncMeeting = useCallback(
+    (id: string) => {
+      const synced = communicationService.getMeeting(id);
+      if (synced) setMeeting(synced);
+    },
+    [communicationService],
+  );
+
+  // Initialize meeting
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    const agents = [bossAgent, ...defaultAgents];
+    const newMeeting = communicationService.createMeeting(agents, true);
+
+    communicationService.addMessage(
+      newMeeting.id,
+      "system",
+      "System",
+      translate("meeting_started", language),
+      language,
+      "system",
+    );
+
+    communicationService.addMessage(
+      newMeeting.id,
+      bossAgent.id,
+      bossAgent.name,
+      language === "en"
+        ? "Good day, team. Let's collaborate on today's challenges."
+        : "नमस्ते, टीम। आइए आज की चुनौतियों पर सहयोग करें।",
+      language,
+      "text",
+    );
+
+    const synced = communicationService.getMeeting(newMeeting.id);
+    if (synced) setMeeting(synced);
+  }, []);
+
+  const handleSendMessage = async (content: string) => {
+    if (!meeting || !selectedAgent) return;
+
+    communicationService.addMessage(
+      meeting.id,
+      selectedAgent,
+      meeting.agents.find((a) => a.id === selectedAgent)?.name || "Unknown",
+      content,
+      language,
+      "text",
+    );
+  };
+
+  const handleAudioRecorded = async (audioBlob: Blob, transcript?: string) => {
+    if (!meeting || !selectedAgent) return;
+
+    // Create audio URL
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    // Add message with audio
+    communicationService.addMessage(
+      meeting.id,
+      selectedAgent,
+      meeting.agents.find((a) => a.id === selectedAgent)?.name || "Unknown",
+      transcript || (language === "en" ? "[Audio Message]" : "[ऑडियो संदेश]"),
+      language,
+      "audio",
+      audioUrl,
+      transcript,
+    );
+  };
+
+  const handleCreateTask = () => {
+    if (!meeting) return;
+
+    const taskTitle = language === "en" ? "New Task" : "नया कार्य";
+    const taskDesc =
+      language === "en"
+        ? "A new task has been created for the team"
+        : "टीम के लिए एक नया कार्य बनाया गया है";
+
+    communicationService.addTask(
+      meeting.id,
+      taskTitle,
+      "fix",
+      "high",
+      taskDesc,
+      [selectedAgent || defaultAgents[0].id],
+    );
+
+    syncMeeting(meeting.id);
+  };
+
+  const handleBossApproveTask = (taskId: string) => {
+    if (!meeting) return;
+
+    const updatedTask = communicationService.approveTask(meeting.id, taskId);
+    syncMeeting(meeting.id);
+
+    // Add system message
+    communicationService.addMessage(
+      meeting.id,
+      "system",
+      "System",
+      `${translate("task_approved", language)}: ${updatedTask.title}`,
+      language,
+      "system",
+    );
+  };
+
+  const handleExecuteTask = (taskId: string) => {
+    if (!meeting) return;
+
+    const task = meeting.tasks.find((t) => t.id === taskId);
+    if (!task || !task.bossApproved) {
+      alert(
+        language === "en"
+          ? "Task must be approved by Boss first"
+          : "कार्य को पहले बॉस द्वारा मंजूरी दी जानी चाहिए",
+      );
+      return;
+    }
+
+    const updatedTask = communicationService.updateTaskStatus(
+      meeting.id,
+      taskId,
+      "in-progress",
+    );
+
+    syncMeeting(meeting.id);
+
+    communicationService.addMessage(
+      meeting.id,
+      "system",
+      "System",
+      `${translate("task_executing", language)}: ${updatedTask.title}`,
+      language,
+      "system",
+    );
+  };
+
+  const toggleBossPresence = () => {
+    if (meeting) {
+      const updated = communicationService.bossPresentToggle(
+        meeting.id,
+        !isBossPresent,
+      );
+      setIsBossPresent(updated.bossPresent);
+
+      communicationService.addMessage(
+        meeting.id,
+        "system",
+        "System",
+        isBossPresent
+          ? translate("boss_joined", language)
+          : language === "en"
+            ? "Boss has left the meeting"
+            : "बॉस बैठक छोड़ गए हैं",
+        language,
+        "system",
+      );
+    }
+  };
+
+  const handleEndMeeting = () => {
+    if (meeting) {
+      communicationService.endMeeting(meeting.id);
+      onClose?.();
+    }
+  };
+
+  if (!meeting) {
+    return (
+      <div className="flex items-center justify-center h-screen vol-well">
+        <div className="text-center">
+          <div className="animate-spin mb-4">
+            <div className="w-12 h-12 border-4 vol-line border-t-blue-500 rounded-full" />
+          </div>
+          <p className="vol-t1">
+            {language === "en"
+              ? "Initializing meeting..."
+              : "बैठक प्रारंभ कर रहे हैं..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full min-h-[100dvh] bg-gradient-to-br from-[var(--grad-a)] via-[var(--grad-a)] to-[var(--grad-b)] p-4 sm:p-6 overflow-y-auto">
+      {/* Header */}
+      <div className="mb-4 sm:mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600">
+            <Users className="w-5 h-5 vol-t1" />
+          </div>
+          <div>
+            <h1 className="text-sm sm:text-2xl font-bold vol-t1">
+              {language === "en" ? "Meeting Panel" : "बैठक पैनल"}
+            </h1>
+            <p className="text-[10px] sm:text-sm vol-t2">
+              {language === "en"
+                ? `${messages.length} messages • ${tasks.length} tasks`
+                : `${messages.length} संदेश • ${tasks.length} कार्य`}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 sm:gap-3">
+          {/* Language Toggle */}
+          <div className="flex gap-1 vol-wash rounded-lg p-1">
+            <button
+              onClick={() => setLanguage("en")}
+              className={`icon-btn sm:px-3 sm:py-1.5 rounded font-semibold text-[10px] sm:text-sm transition-all ${
+                language === "en"
+                  ? "bg-[var(--color-info)] text-black"
+                  : "vol-t2 hover:vol-t1"
+              }`}
+            >
+              EN
+            </button>
+            <button
+              onClick={() => setLanguage("hi")}
+              className={`icon-btn sm:px-3 sm:py-1.5 rounded font-semibold text-[10px] sm:text-sm transition-all ${
+                language === "hi"
+                  ? "bg-[var(--color-info)] text-black"
+                  : "vol-t2 hover:vol-t1"
+              }`}
+            >
+              HI
+            </button>
+          </div>
+
+          {/* Settings Button */}
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="icon-btn"
+            title={language === "en" ? "Settings" : "सेटिंग्स"}
+            aria-label={language === "en" ? "Settings" : "सेटिंग्स"}
+          >
+            <Settings className="w-5 h-5 vol-t2 hover:vol-t1" />
+          </button>
+
+          {/* Boss Presence Toggle */}
+          <button
+            onClick={toggleBossPresence}
+            className={`icon-btn sm:px-4 sm:py-2 rounded-lg font-semibold text-[10px] sm:text-sm transition-all ${
+              isBossPresent
+                ? "bg-[var(--color-warning)] text-black"
+                : "vol-t2 hover:vol-t1"
+            }`}
+          >
+            <Crown className="w-4 h-4 mr-1" />{" "}
+            {language === "en" ? "Boss" : "बॉस"}
+          </button>
+
+          {/* Close Button */}
+          <button
+            onClick={handleEndMeeting}
+            className="icon-btn hover:bg-[rgba(239,68,68,0.15)] text-red-400 hover:text-red-300"
+            title={language === "en" ? "End Meeting" : "बैठक समाप्त करें"}
+            aria-label={language === "en" ? "End Meeting" : "बैठक समाप्त करें"}
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Settings Panel */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-4 p-4 rounded-xl vol-wash border vol-line"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold vol-t1 block mb-2">
+                  {language === "en" ? "Select Agent:" : "एजेंट चुनें:"}
+                </label>
+                <select
+                  value={selectedAgent || ""}
+                  onChange={(e) => setSelectedAgent(e.target.value)}
+                  className="w-full vol-panel border vol-line rounded-lg px-3 py-3 vol-t1 text-sm focus:outline-none focus:border-[var(--color-ring)] min-h-[44px]"
+                >
+                  {Array.from(agentsMap.values()).map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name} ({agent.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold vol-t1 block mb-2">
+                  {language === "en" ? "Tasks:" : "कार्य:"}
+                </label>
+                <button
+                  onClick={handleCreateTask}
+                  className="w-full px-4 py-3 rounded-lg bg-[var(--color-success)] text-black font-semibold text-sm hover:bg-[var(--color-success)]/80 transition-all flex items-center justify-center gap-2 min-h-[44px]"
+                >
+                  <Plus className="w-4 h-4" />
+                  {language === "en" ? "New Task" : "नया कार्य"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main Layout — single column on mobile, 3-column on desktop */}
+      <div className="grid gap-4 sm:grid-cols-3 lg:gap-6">
+        {/* Left: Chat (full width on mobile, 2/3 on desktop) */}
+        <div className="col-span-1 sm:col-span-2">
+          <AgentGroupChat
+            messages={messages}
+            agents={agentsMap}
+            language={language}
+            onMessageSend={handleSendMessage}
+          />
+        </div>
+
+        {/* Right: Audio + Execution (full width on mobile, 1/3 on desktop) */}
+        <div className="flex flex-col gap-4">
+          {/* Audio Interface */}
+          <div className="min-h-[200px] sm:h-[300px]">
+            <AudioInterface
+              language={language}
+              onRecordingComplete={handleAudioRecorded}
+            />
+          </div>
+
+          {/* Execution Panel */}
+          <div className="min-h-[200px] sm:h-[300px] overflow-y-auto">
+            <ExecutionPanel
+              tasks={tasks}
+              agents={agentsMap}
+              bossPresent={isBossPresent}
+              language={language}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Task Control Bar (Bottom) */}
+      {tasks.length > 0 && (
+        <div className="mt-4 p-3 rounded-xl vol-wash border vol-line">
+          <div className="flex items-center justify-between text-xs">
+            <span className="vol-t1 font-semibold">
+              {language === "en" ? "Quick Actions:" : "त्वरित क्रिया:"}
+            </span>
+            <div className="flex gap-2">
+              {tasks
+                .filter((t) => t.status === "planned" && !t.bossApproved)
+                .slice(0, 3)
+                .map((task) => (
+                  <button
+                    key={task.id}
+                    onClick={() => handleBossApproveTask(task.id)}
+                    className="icon-btn sm:px-4 sm:py-1.5 bg-[var(--color-warning)] text-black hover:bg-[var(--color-warning)]/80 font-semibold"
+                    disabled={!isBossPresent}
+                    title={isBossPresent ? "" : "Boss must be present"}
+                  >
+                    {language === "en" ? "Approve" : "मंजूर करें"}
+                  </button>
+                ))}
+
+              {tasks
+                .filter((t) => t.status === "planned" && t.bossApproved)
+                .slice(0, 3)
+                .map((task) => (
+                  <button
+                    key={task.id}
+                    onClick={() => handleExecuteTask(task.id)}
+                    className="icon-btn sm:px-4 sm:py-1.5 bg-[var(--color-success)] text-black hover:bg-[var(--color-success)]/80 font-semibold"
+                  >
+                    {language === "en" ? "Execute" : "निष्पादित करें"}
+                  </button>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
